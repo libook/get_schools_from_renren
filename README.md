@@ -7,7 +7,7 @@ To get all middle schools (junior high schools) of China from renren.com .
 ## Execution
 
 0. Clone the code.
-1. >npm install
+1. ```npm install```
 2. node run.js
 
 ## License
