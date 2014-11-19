@@ -1,0 +1,32 @@
+{
+  "name": "get_schools_from_renren",
+  "description": "To get all middle schools (junior high schools) of China from renren.com .",
+  "version": "1.0",
+  "keywords": [
+    "schools",
+    "renren",
+    "crawler"
+  ],
+  "license": "WTFPL",
+  "private": false,
+  "author": {
+    "name": "LiBook",
+    "email": "libook7@qq.com",
+    "url": "http://libook.com.cn/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/guanghetv/get_schools_from_renren.git"
+  },
+  "engines": {
+    "node": "latest",
+    "npm": "latest"
+  },
+  "dependencies": {
+    "async": "latest",
+    "http-sync": "latest",
+    "jsdom": "latest",
+    "mongoose": "latest",
+    "jquery": "latest"
+  }
+}
