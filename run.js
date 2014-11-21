@@ -160,15 +160,27 @@ var provinceSchema = mongoose.Schema({
         type: String,
         index: true
     },
+    code: {
+        type: String,
+        index: true
+    },
     cities: [
         {
             name: {
                 type: String,
                 index: true
             },
+            code: {
+                type: String,
+                index: true
+            },
             districts: [
                 {
                     name: {
+                        type: String,
+                        index: true
+                    },
+                    code: {
                         type: String,
                         index: true
                     },
