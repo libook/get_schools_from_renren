@@ -141,6 +141,8 @@ cities._31 = ["3501:福州市", "3502:厦门市", "3503:莆田市", "3504:三明
 //cities._32 = ["7101:台北市", "7102:高雄市", "7103:基隆市", "7104:台中市", "7105:台南市", "7106:新竹市", "7107:嘉义市"];
 //cities._33 = ["8101:中西区", "8102:湾仔区", "8103:东区", "8104:南区", "8105:油尖旺区", "8106:深水埗区", "8107:九龙城区", "8108:黄大仙区", "8109:观塘区", "8110:荃湾区", "8111:葵青区", "8112:沙田区", "8113:西贡区", "8114:大埔区", "8115:北区", "8116:元朗区", "8117:屯门区", "8118:离岛区"];
 //cities._34 = ["8200:澳门"];
+//cities._35 = ["60700000:美国", "60501000:英国", "60600000:加拿大", "60100000:澳大利亚", "60200001:法国", "60300001:新加坡", "60400001:新西兰", "60800001:德国", "60900001:韩国", "61000001:俄罗斯", "61100001:日本", "61200001:意大利", "61300001:爱尔兰", "61400001:荷兰", "61500001:马来西亚", "61600001:瑞士", "61700001:泰国", "61800001:乌克兰", "61900001:南非", "62000001:芬兰", "62100001:瑞典", "62900000:奥地利", "62200001:西班牙", "62300001:比利时", "62400001:挪威", "62500001:丹麦", "62600001:菲律宾", "62700001:波兰", "62800001:印度", "63000000:阿根廷", "63100000:巴西", "63200000:白俄罗斯", "63300000:哥伦比亚", "63400000:古巴", "63500000:埃及", "63600000:希腊", "63700000:匈牙利", "63800000:印度尼西亚", "63900000:伊朗", "64000000:蒙古", "64100000:墨西哥", "64200000:葡萄牙", "64300000:沙特阿拉伯", "64400000:土耳其"];
+//cities._36 = ["9101:美国", "9102:澳大利亚", "9103:加拿大", "919001:英国", "919002:新加坡"];
 
 //provinces省
 //cities市
@@ -214,7 +216,9 @@ const schoolSchema = mongoose.Schema({
     official: {
         type: Boolean,
         default: false
-    }
+    },
+    "region0": String,
+    "region1": String
 });
 let Province = mongoose.model('Province', provinceSchema);
 let School = mongoose.model('School', schoolSchema);
@@ -261,7 +265,7 @@ db.once('open', function callback() {
     };
 
     /**********获取省级行政单位**********/
-    {
+    co(function *() {
         for (let pIndex in provinces) {
             provinces[pIndex].cities = cities[provinces[pIndex].code];
             console.info(provinces[pIndex].name);
@@ -277,60 +281,70 @@ db.once('open', function callback() {
                 /**********获取县区级行政单位**********/
                 provinces[pIndex].cities[cIndex].districts = [];
 
-                req(provinces[pIndex].cities[cIndex].code).then(function (response) {
-                    jsdom.env(
-                        response.toString(),
-                        function (err, window) {
-                            let $ = require('jquery')(window);
-
-                            //要操作的DOM初始化完毕，并声称jquery对象$
-
-                            let districtsLis = $('#schoolCityQuList').children('li');
-                            for (let dIndex = 0; dIndex < districtsLis.length; dIndex++) {
-                                let districtAs = $(districtsLis[dIndex]).children('a');
-                                let district = {};
-                                district.name = $(districtAs).text();
-                                district.code = $(districtAs).attr('onclick').replace(/[^0-9]/igm, '');//<a href="#highschool_anchor" onclick="SchoolComponent.tihuan('city_qu_130202')">路南区</a>
-                                //console.info('        ' + district.name);
-
-                                /**********获取所有学校**********/
-                                district.schools = [];
-                                let schoolsLis = $('#city_qu_' + district.code).children('li');
-                                for (let sIndex = 0; sIndex < schoolsLis.length; sIndex++) {
-                                    let schoolAs = $(schoolsLis[sIndex]).children('a');
-                                    let school = {};
-                                    school.name = $(schoolAs).text();
-                                    school.code = $(schoolAs).attr('href');
-                                    school._id = new mongoose.Types.ObjectId;
-                                    school.official = true;
-                                    district.schools.push(school._id);
-                                    console.info('schoolCount:' + (++schoolCount));
-                                    new School(school).save(function (err) {
-                                        if (err) return console.error(err);
-                                        console.info('schoolCount:' + (--schoolCount));
-                                    });
-                                    //console.info('            ' + school.name);
+                let response = yield req(provinces[pIndex].cities[cIndex].code);
+                let todom = function (str) {
+                    return new Promise(function (resolve, reject) {
+                        jsdom.env(
+                            str,
+                            function (err, window) {
+                                if (err) {
+                                    reject(err);
+                                } else {
+                                    resolve(window);
                                 }
-
-                                provinces[pIndex].cities[cIndex].districts.push(district);
                             }
-                        }
-                    );
-                }).catch((error)=> {
-                    console.error(error.stack)
-                });
+                        );
+                    });
+                };
+
+                let window = yield todom(response.toString());
+
+                let $ = require('jquery')(window);
+
+                //要操作的DOM初始化完毕，并声称jquery对象$
+
+                let districtsLis = $('#schoolCityQuList').children('li');
+                if (districtsLis.length == 0) {
+                    districtsLis.push(`<li><a href="#highschool_anchor" onclick="SchoolComponent.tihuan('city_qu_${provinces[pIndex].cities[cIndex].code}')">${provinces[pIndex].cities[cIndex].name }</a></li>`);
+                }
+                for (let dIndex = 0; dIndex < districtsLis.length; dIndex++) {
+                    let districtAs = $(districtsLis[dIndex]).children('a');
+                    let district = {};
+                    district.name = $(districtAs).text();
+                    district.code = $(districtAs).attr('onclick').replace(/[^0-9]/igm, '');//<a href="#highschool_anchor" onclick="SchoolComponent.tihuan('city_qu_130202')">路南区</a>
+                    //console.info('        ' + district.name);
+
+                    /**********获取所有学校**********/
+                    district.schools = [];
+                    let schoolsLis = $('#city_qu_' + district.code).children('li');
+                    for (let sIndex = 0; sIndex < schoolsLis.length; sIndex++) {
+                        let schoolAs = $(schoolsLis[sIndex]).children('a');
+                        let school = {};
+                        school.name = $(schoolAs).text();
+                        school.code = $(schoolAs).attr('href');
+                        school._id = new mongoose.Types.ObjectId;
+                        school.official = true;
+                        school.region0 = provinces[pIndex].name;
+                        school.region1 = provinces[pIndex].cities[cIndex].name;
+                        district.schools.push(school._id);
+                        console.info('schoolCount:' + (++schoolCount));
+                        let newSchool = new School(school);
+                        yield newSchool.save();
+                        //console.info('            ' + school.name);
+                    }
+
+                    provinces[pIndex].cities[cIndex].districts.push(district);
+                }
             }
 
             console.info('provinceCount:' + (++provinceCount));
             let province = new Province(provinces[pIndex]);
-            province.save().catch((error)=> {
-                console.error(error.stack)
-            });
+            yield province.save();
         }
         console.info('OK!');
-    }
-
-
-    //School.create(provinces);
-    //mongoose.connection.close();
+        mongoose.connection.close();
+        process.exit(0);
+    }).catch((error)=> {
+        console.error(error);
+    });
 });
