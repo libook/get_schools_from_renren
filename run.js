@@ -1,5 +1,7 @@
+'use strict';
+
 /**********初始化数据**********/
-var provinces = [{
+const provinces = [{
     "code": "_1",
     "name": "北京"
 }, {
@@ -103,7 +105,7 @@ var provinces = [{
 //    "name": "澳门"
 }];
 
-var cities = {};
+let cities = {};
 
 cities._1 = ["1101:北京市"];
 cities._2 = ["3101:上海市"];
@@ -116,7 +118,7 @@ cities._8 = ["3701:济南市", "3702:青岛市", "3703:淄博市", "3704:枣庄�
 cities._9 = ["1401:太原市", "1402:大同市", "1403:阳泉市", "1404:长治市", "1405:晋城市", "1406:朔州市", "1407:晋中市", "1408:运城市", "1409:忻州市", "1410:临汾市", "1411:吕梁市"];
 cities._10 = ["6101:西安市", "6102:铜川市", "6103:宝鸡市", "6104:咸阳市", "6105:渭南市", "6106:延安市", "6107:汉中市", "6108:榆林市", "6109:安康市", "6110:商洛市"];
 cities._11 = ["1301:石家庄市", "1302:唐山市", "1303:秦皇岛市", "1304:邯郸市", "1305:邢台市", "1306:保定市", "1307:张家口市", "1308:承德市", "1309:沧州市", "1310:廊坊市", "1311:衡水市"];
-cities._12  = ["4101:郑州市", "4102:开封市", "4103:洛阳市", "4104:平顶山市", "4105:安阳市", "4106:鹤壁市", "4107:新乡市", "4108:焦作市", "4109:濮阳市", "4110:许昌市", "4111:漯河市", "4112:三门峡市", "4113:南阳市", "4114:商丘市", "4115:信阳市", "4116:周口市", "4117:驻马店市", "4118:济源市"];
+cities._12 = ["4101:郑州市", "4102:开封市", "4103:洛阳市", "4104:平顶山市", "4105:安阳市", "4106:鹤壁市", "4107:新乡市", "4108:焦作市", "4109:濮阳市", "4110:许昌市", "4111:漯河市", "4112:三门峡市", "4113:南阳市", "4114:商丘市", "4115:信阳市", "4116:周口市", "4117:驻马店市", "4118:济源市"];
 cities._13 = ["4201:武汉市", "4202:黄石市", "4203:十堰市", "4205:宜昌市", "4206:襄樊市", "4207:鄂州市", "4208:荆门市", "4209:孝感市", "4210:荆州市", "4211:黄冈市", "4212:咸宁市", "4213:随州市", "4228:恩施土家族苗族自治州", "429004:仙桃市", "429005:潜江市", "429006:天门市", "429021:神农架林区"];
 cities._14 = ["4301:长沙市", "4302:株洲市", "4303:湘潭市", "4304:衡阳市", "4305:邵阳市", "4306:岳阳市", "4307:常德市", "4308:张家界市", "4309:益阳市", "4310:郴州市", "4311:永州市", "4312:怀化市", "4313:娄底市", "4331:湘西土家族苗族自治州"];
 cities._15 = ["4601:海口市", "4602:三亚市", "469001:五指山市", "469002:琼海市", "469003:儋州市", "469005:文昌市", "469006:万宁市", "469007:东方市", "469025:定安县", "469026:屯昌县", "469027:澄迈县", "469028:临高县", "469030:白沙黎族自治县", "469031:昌江黎族自治县", "469033:乐东黎族自治县", "469034:陵水黎族自治县", "469035:保亭黎族苗族自治县", "469036:琼中黎族苗族自治县"];
@@ -146,16 +148,16 @@ cities._31 = ["3501:福州市", "3502:厦门市", "3503:莆田市", "3504:三明
 
 
 /**********引用modules**********/
-var mongoose = require('mongoose');
-var jsdom = require('jsdom').jsdom;
-var httpSync = require('http-sync');
-var async = require('async');
-
+const mongoose = require('mongoose');
+const jsdom = require('jsdom').jsdom;
+const async = require('async');
+const http = require('http');
+const co = require('co');
 
 /**********初始化数据库**********/
-var Schema = mongoose.Schema;
+const Schema = mongoose.Schema;
 
-var provinceSchema = mongoose.Schema({
+const provinceSchema = mongoose.Schema({
     name: {
         type: String,
         index: true
@@ -198,7 +200,7 @@ var provinceSchema = mongoose.Schema({
     ]
 });
 
-var schoolSchema = mongoose.Schema({
+const schoolSchema = mongoose.Schema({
     _id: {
         type: Schema.Types.ObjectId,
         default: function () {
@@ -214,30 +216,59 @@ var schoolSchema = mongoose.Schema({
         default: false
     }
 });
-var Province = mongoose.model('Province', provinceSchema);
-var School = mongoose.model('School', schoolSchema);
+let Province = mongoose.model('Province', provinceSchema);
+let School = mongoose.model('School', schoolSchema);
 
 mongoose.connect('mongodb://localhost/schools');
 
-var db = mongoose.connection;
+let db = mongoose.connection;
 
 db.on('error', console.error.bind(console, 'connection error:'));
 
-var schoolCount = 0;
-var provinceCount = 0;
+let schoolCount = 0;
+let provinceCount = 0;
 
 db.once('open', function callback() {
     console.info("Connected!");
 
+    let req = function (code) {
+        return new Promise(function (resolve, reject) {
+            let req = http.request({
+                method: 'GET',
+                headers: {},
+                body: '',
+                host: 'support.renren.com',
+                port: 80, //443 if protocol = https
+                path: '/juniorschool/' + code + '.html'
+            }, (res)=> {
+                let data = 0;
+                res.setEncoding('utf8');
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+                res.on('end', () => {
+                    resolve(data);
+                });
+            });
+
+            req.on('error', (e) => {
+                reject(e);
+            });
+
+            // req.write(postData);
+            req.end();
+        });
+    };
+
     /**********获取省级行政单位**********/
-    function getPlaces() {
-        for (var pIndex in provinces) {
+    co(function *() {
+        for (let pIndex in provinces) {
             provinces[pIndex].cities = cities[provinces[pIndex].code];
             console.info(provinces[pIndex].name);
 
             /**********获取地级行政单位**********/
-            for (var cIndex in provinces[pIndex].cities) {
-                var tempC = provinces[pIndex].cities[cIndex].split(':');
+            for (let cIndex in provinces[pIndex].cities) {
+                let tempC = provinces[pIndex].cities[cIndex].split(':');
                 provinces[pIndex].cities[cIndex] = {};
                 provinces[pIndex].cities[cIndex].code = tempC[0];
                 provinces[pIndex].cities[cIndex].name = tempC[1];
@@ -245,69 +276,59 @@ db.once('open', function callback() {
 
                 /**********获取县区级行政单位**********/
                 provinces[pIndex].cities[cIndex].districts = [];
-                var request = httpSync.request({
-                    method: 'GET',
-                    headers: {},
-                    body: '',
 
-                    protocol: 'http',
-                    host: 'support.renren.com',
-                    port: 80, //443 if protocol = https
-                    path: '/juniorschool/' + provinces[pIndex].cities[cIndex].code + '.html'
-                });
+                let response = yield req(provinces[pIndex].cities[cIndex].code);
 
-                var response = request.end();
+                {
+                    jsdom.env(
+                        response.toString(),
+                        function (err, window) {
+                            let $ = require('jquery')(window);
 
-                function processRes() {
-                    var doc = jsdom(response.body.toString());
-                    var window = doc.parentWindow;
-                    var $ = require('jquery')(window);
-                    //要操作的DOM初始化完毕，并声称jquery对象$
+                            //要操作的DOM初始化完毕，并声称jquery对象$
 
-                    var districtsLis = $('#schoolCityQuList').children('li');
-                    for (var dIndex = 0; dIndex < districtsLis.length; dIndex++) {
-                        var districtAs = $(districtsLis[dIndex]).children('a');
-                        var district = {};
-                        district.name = $(districtAs).text();
-                        district.code = $(districtAs).attr('onclick').replace(/[^0-9]/igm, '');//<a href="#highschool_anchor" onclick="SchoolComponent.tihuan('city_qu_130202')">路南区</a>
-                        //console.info('        ' + district.name);
+                            let districtsLis = $('#schoolCityQuList').children('li');
+                            for (let dIndex = 0; dIndex < districtsLis.length; dIndex++) {
+                                let districtAs = $(districtsLis[dIndex]).children('a');
+                                let district = {};
+                                district.name = $(districtAs).text();
+                                district.code = $(districtAs).attr('onclick').replace(/[^0-9]/igm, '');//<a href="#highschool_anchor" onclick="SchoolComponent.tihuan('city_qu_130202')">路南区</a>
+                                //console.info('        ' + district.name);
 
-                        /**********获取所有学校**********/
-                        district.schools = [];
-                        var schoolsLis = $('#city_qu_' + district.code).children('li');
-                        for (var sIndex = 0; sIndex < schoolsLis.length; sIndex++) {
-                            var schoolAs = $(schoolsLis[sIndex]).children('a');
-                            var school = {};
-                            school.name = $(schoolAs).text();
-                            school.code = $(schoolAs).attr('href');
-                            school._id = new mongoose.Types.ObjectId;
-                            school.official = true;
-                            district.schools.push(school._id);
-                            console.info('schoolCount:' + (++schoolCount));
-                            new School(school).save(function (err) {
-                                if (err) return console.error(err);
-                                console.info('schoolCount:' + (--schoolCount));
-                            });
-                            //console.info('            ' + school.name);
+                                /**********获取所有学校**********/
+                                district.schools = [];
+                                let schoolsLis = $('#city_qu_' + district.code).children('li');
+                                for (let sIndex = 0; sIndex < schoolsLis.length; sIndex++) {
+                                    let schoolAs = $(schoolsLis[sIndex]).children('a');
+                                    let school = {};
+                                    school.name = $(schoolAs).text();
+                                    school.code = $(schoolAs).attr('href');
+                                    school._id = new mongoose.Types.ObjectId;
+                                    school.official = true;
+                                    district.schools.push(school._id);
+                                    console.info('schoolCount:' + (++schoolCount));
+                                    new School(school).save(function (err) {
+                                        if (err) return console.error(err);
+                                        console.info('schoolCount:' + (--schoolCount));
+                                    });
+                                    //console.info('            ' + school.name);
+                                }
+
+                                provinces[pIndex].cities[cIndex].districts.push(district);
+                            }
                         }
-
-                        provinces[pIndex].cities[cIndex].districts.push(district);
-                    }
+                    );
                 }
-
-                processRes();
             }
 
             console.info('provinceCount:' + (++provinceCount));
-            new Province(provinces[pIndex]).save(function (err) {
-                if (err) return console.error(err);
-                console.info('provinceCount:' + (--provinceCount));
-            });
+            let province = new Province(provinces[pIndex]);
+            yield province.save();
         }
-    }
-
-    getPlaces();
-    console.info('OK!');
+        console.info('OK!');
+    }).catch((error)=> {
+        console.error(error.stack);
+    });
 
 
     //School.create(provinces);
