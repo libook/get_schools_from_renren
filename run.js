@@ -261,7 +261,7 @@ db.once('open', function callback() {
     };
 
     /**********获取省级行政单位**********/
-    co(function *() {
+    {
         for (let pIndex in provinces) {
             provinces[pIndex].cities = cities[provinces[pIndex].code];
             console.info(provinces[pIndex].name);
@@ -277,9 +277,7 @@ db.once('open', function callback() {
                 /**********获取县区级行政单位**********/
                 provinces[pIndex].cities[cIndex].districts = [];
 
-                let response = yield req(provinces[pIndex].cities[cIndex].code);
-
-                {
+                req(provinces[pIndex].cities[cIndex].code).then(function (response) {
                     jsdom.env(
                         response.toString(),
                         function (err, window) {
@@ -318,17 +316,19 @@ db.once('open', function callback() {
                             }
                         }
                     );
-                }
+                }).catch((error)=> {
+                    console.error(error.stack)
+                });
             }
 
             console.info('provinceCount:' + (++provinceCount));
             let province = new Province(provinces[pIndex]);
-            yield province.save();
+            province.save().catch((error)=> {
+                console.error(error.stack)
+            });
         }
         console.info('OK!');
-    }).catch((error)=> {
-        console.error(error.stack);
-    });
+    }
 
 
     //School.create(provinces);
